@@ -1,0 +1,44 @@
+name: BBXY Daily Check-in
+
+on:
+  schedule:
+    # GitHub cron uses UTC: 01:00 UTC = 09:00 Asia/Shanghai.
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bbxy-daily-checkin
+  cancel-in-progress: false
+
+jobs:
+  checkin:
+    name: Daily check-in
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate check-in logic
+        run: python -m unittest discover -s tests -v
+      - name: Sign in and check in
+        env:
+          BBXY_EMAIL: ${{ secrets.BBXY_EMAIL }}
+          BBXY_PASSWORD: ${{ secrets.BBXY_PASSWORD }}
+        run: python checkin.py
+      - name: Save result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bbxy-result-${{ github.run_id }}-${{ github.run_attempt }}
+          path: result.json
+          if-no-files-found: ignore
+          retention-days: 14
